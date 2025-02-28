@@ -494,6 +494,25 @@ fu_device_version_format_func(void)
 }
 
 static void
+fu_device_version_format_raw_func(void)
+{
+	g_autoptr(FuDevice) device = g_object_new(FU_TYPE_USB_DEVICE, NULL);
+
+	/* like normal */
+	fu_device_set_version_format(device, FWUPD_VERSION_FORMAT_BCD);
+	fu_device_set_version_raw(device, 256);
+	fu_device_set_version_lowest_raw(device, 257);
+
+	g_assert_cmpstr(fu_device_get_version(device), ==, "1.0");
+	g_assert_cmpstr(fu_device_get_version_lowest(device), ==, "1.1");
+
+	/* ensure both are changed */
+	fu_device_set_version_format(device, FWUPD_VERSION_FORMAT_PLAIN);
+	g_assert_cmpstr(fu_device_get_version(device), ==, "256");
+	g_assert_cmpstr(fu_device_get_version_lowest(device), ==, "257");
+}
+
+static void
 fu_device_open_refcount_func(void)
 {
 	gboolean ret;
@@ -2187,7 +2206,7 @@ fu_device_vfuncs_func(void)
 	g_autoptr(FuContext) ctx = fu_context_new();
 	g_autoptr(FuDevice) device = fu_device_new(ctx);
 	g_autoptr(FuProgress) progress = fu_progress_new(G_STRLOC);
-	g_autoptr(GInputStream) istream = g_memory_input_stream_new();
+	g_autoptr(FuFirmware) firmware_dummy = fu_firmware_new();
 	g_autoptr(FuFirmware) firmware = NULL;
 	g_autoptr(GBytes) blob = NULL;
 	g_autoptr(GError) error = NULL;
@@ -2198,7 +2217,11 @@ fu_device_vfuncs_func(void)
 	g_assert_false(ret);
 	g_clear_error(&error);
 
-	ret = fu_device_write_firmware(device, istream, progress, FWUPD_INSTALL_FLAG_NONE, &error);
+	ret = fu_device_write_firmware(device,
+				       firmware_dummy,
+				       progress,
+				       FWUPD_INSTALL_FLAG_NONE,
+				       &error);
 	g_assert_error(error, FWUPD_ERROR, FWUPD_ERROR_NOT_SUPPORTED);
 	g_assert_false(ret);
 	g_clear_error(&error);
@@ -2704,12 +2727,8 @@ fu_backend_emulate_func(void)
 			     "  \"UsbDevices\" : [\n"
 			     "    {\n"
 			     "      \"GType\" : \"FuUdevDevice\",\n"
-#if GLIB_CHECK_VERSION(2, 80, 0)
 			     "      \"BackendId\" : \"usb:FF:FF:06\",\n"
 			     "      \"Created\" : \"2099-02-01T16:35:03Z\"\n"
-#else
-			     "      \"BackendId\" : \"usb:FF:FF:06\"\n"
-#endif
 			     "    }\n"
 			     "  ]\n"
 			     "}";
@@ -2949,7 +2968,11 @@ fu_chunk_func(void)
 	chunked5 = fu_chunk_array_new(NULL, 0, 0x0, 0x0, 4);
 	g_assert_cmpint(chunked5->len, ==, 0);
 	chunked5_str = fu_chunk_array_to_string(chunked5);
+#if LIBXMLB_CHECK_VERSION(0, 3, 22)
+	g_assert_cmpstr(chunked5_str, ==, "<chunks />\n");
+#else
 	g_assert_cmpstr(chunked5_str, ==, "<chunks>\n</chunks>\n");
+#endif
 
 	chunked1 = fu_chunk_array_new((const guint8 *)"0123456789abcdef", 16, 0x0, 10, 4);
 	chunked1_str = fu_chunk_array_to_string(chunked1);
@@ -3643,7 +3666,7 @@ fu_firmware_build_func(void)
 	g_assert_cmpstr(fu_firmware_get_version(firmware), ==, "1.2.3");
 
 	/* verify image */
-	img = fu_firmware_get_image_by_id(firmware, "header", &error);
+	img = fu_firmware_get_image_by_id(firmware, "h?ad*", &error);
 	g_assert_no_error(error);
 	g_assert_nonnull(img);
 	g_assert_cmpstr(fu_firmware_get_version(img), ==, "4.5.6");
@@ -5871,7 +5894,6 @@ fu_composite_input_stream_func(void)
 	g_autoptr(GBytes) blob1 = g_bytes_new_static("ab", 2);
 	g_autoptr(GBytes) blob2 = g_bytes_new_static("cde", 3);
 	g_autoptr(GBytes) blob3 = g_bytes_new_static("xxxfgyyy", 8);
-	g_autoptr(GBytes) blob4 = NULL;
 	g_autoptr(GInputStream) composite_stream = fu_composite_input_stream_new();
 	g_autoptr(GInputStream) stream3 = g_memory_input_stream_new_from_bytes(blob3);
 	g_autoptr(GInputStream) stream4 = NULL;
@@ -6726,6 +6748,7 @@ main(int argc, char **argv)
 	g_test_add_func("/fwupd/device{metadata}", fu_device_metadata_func);
 	g_test_add_func("/fwupd/device{open-refcount}", fu_device_open_refcount_func);
 	g_test_add_func("/fwupd/device{version-format}", fu_device_version_format_func);
+	g_test_add_func("/fwupd/device{version-format-raw}", fu_device_version_format_raw_func);
 	g_test_add_func("/fwupd/device{retry-success}", fu_device_retry_success_func);
 	g_test_add_func("/fwupd/device{retry-failed}", fu_device_retry_failed_func);
 	g_test_add_func("/fwupd/device{retry-hardware}", fu_device_retry_hardware_func);

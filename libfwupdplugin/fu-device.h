@@ -321,8 +321,6 @@ fu_device_new(FuContext *ctx);
 #define fu_device_set_update_error(d, v) fwupd_device_set_update_error(FWUPD_DEVICE(d), v)
 #define fu_device_add_vendor_id(d, v)	 fwupd_device_add_vendor_id(FWUPD_DEVICE(d), v)
 #define fu_device_add_protocol(d, v)	 fwupd_device_add_protocol(FWUPD_DEVICE(d), v)
-#define fu_device_set_version_lowest_raw(d, v)                                                     \
-	fwupd_device_set_version_lowest_raw(FWUPD_DEVICE(d), v)
 #define fu_device_set_version_bootloader_raw(d, v)                                                 \
 	fwupd_device_set_version_bootloader_raw(FWUPD_DEVICE(d), v)
 #define fu_device_set_version_build_date(d, v)                                                     \
@@ -800,6 +798,16 @@ fu_device_new(FuContext *ctx);
  */
 #define FU_DEVICE_PRIVATE_FLAG_COUNTERPART_VISIBLE "counterpart-visible"
 
+/**
+ * FU_DEVICE_PRIVATE_FLAG_DETACH_PREPARE_FIRMWARE:
+ *
+ * Detach, then prepare firmware rather than parsing firmware from the runtime device.
+ * For some devices the firmware GType isn't known until the bootloader gets added.
+ *
+ * Since: 2.0.7
+ */
+#define FU_DEVICE_PRIVATE_FLAG_DETACH_PREPARE_FIRMWARE "detach-prepare-firmware"
+
 /* accessors */
 gchar *
 fu_device_to_string(FuDevice *self) G_GNUC_NON_NULL(1);
@@ -873,6 +881,8 @@ void
 fu_device_set_version_bootloader(FuDevice *self, const gchar *version) G_GNUC_NON_NULL(1);
 void
 fu_device_set_version_raw(FuDevice *self, guint64 version_raw) G_GNUC_NON_NULL(1);
+void
+fu_device_set_version_lowest_raw(FuDevice *self, guint64 version_raw) G_GNUC_NON_NULL(1);
 void
 fu_device_inhibit(FuDevice *self, const gchar *inhibit_id, const gchar *reason)
     G_GNUC_NON_NULL(1, 2);
@@ -985,7 +995,7 @@ gboolean
 fu_device_get_results(FuDevice *self, GError **error) G_GNUC_NON_NULL(1);
 gboolean
 fu_device_write_firmware(FuDevice *self,
-			 GInputStream *stream,
+			 FuFirmware *firmware,
 			 FuProgress *progress,
 			 FwupdInstallFlags flags,
 			 GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_NON_NULL(1, 2, 3);
